@@ -26,6 +26,7 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/vmalloc.h>
+#include <linux/ktime.h>
 
 #include "libxdma.h"
 #include "libxdma_api.h"
@@ -1352,6 +1353,7 @@ static irqreturn_t user_irq_service(int irq, struct xdma_user_irq *user_irq)
 		return user_irq->handler(user_irq->user_idx, user_irq->dev);
 
 	spin_lock_irqsave(&(user_irq->events_lock), flags);
+	user_irq->ts_ns = ktime_get_raw_ns();
 	if (!user_irq->events_irq) {
 		user_irq->events_irq = 1;
 		wake_up_interruptible(&(user_irq->events_wq));
@@ -1602,6 +1604,8 @@ static int is_config_bar(struct xdma_dev *xdev, int idx)
 	irq_id = read_register(&irq_regs->identifier);
 	cfg_id = read_register(&cfg_regs->identifier);
 
+	pr_info("irqid=%x, cfgid=%x\n", irq_id, cfg_id);
+
 	if (((irq_id & mask) == IRQ_BLOCK_ID) &&
 	    ((cfg_id & mask) == CONFIG_BLOCK_ID)) {
 		dbg_init("BAR %d is the XDMA config BAR\n", idx);
@@ -1717,6 +1721,10 @@ static int map_bars(struct xdma_dev *xdev, struct pci_dev *dev)
 	int bar_id_list[XDMA_BAR_NUM];
 	int bar_id_idx = 0;
 	int config_bar_pos = 0;
+
+	// TODO: REMOVE HACKS
+	xdev->config_bar_idx = 1;
+	config_bar_pos = 1;
 
 	/* iterate through all the BARs */
 	for (i = 0; i < XDMA_BAR_NUM; i++) {

@@ -574,6 +574,7 @@ struct xdma_user_irq {
 	irq_handler_t handler;
 
 	void *dev;
+	u64 ts_ns;
 };
 
 /* XDMA PCIe device specific book-keeping */

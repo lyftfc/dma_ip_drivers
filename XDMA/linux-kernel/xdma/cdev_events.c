@@ -20,6 +20,7 @@
 #define pr_fmt(fmt)     KBUILD_MODNAME ":%s: " fmt, __func__
 
 #include "xdma_cdev.h"
+#include <linux/ktime.h>
 
 /*
  * character device file operations for events
@@ -67,7 +68,7 @@ static ssize_t char_events_read(struct file *file, char __user *buf,
 	user_irq->events_irq = 0;
 	spin_unlock_irqrestore(&user_irq->events_lock, flags);
 
-	rv = copy_to_user(buf, &events_user, 4);
+	rv = copy_to_user(buf, &user_irq->ts_ns, 8);
 	if (rv)
 		dbg_sg("Copy to user failed but continuing\n");
 
@@ -92,6 +93,7 @@ static unsigned int char_events_poll(struct file *file, poll_table *wait)
 	}
 
 	poll_wait(file, &user_irq->events_wq,  wait);
+	pr_info("%llx\n", ktime_get_raw_ns());
 
 	spin_lock_irqsave(&user_irq->events_lock, flags);
 	if (user_irq->events_irq)
