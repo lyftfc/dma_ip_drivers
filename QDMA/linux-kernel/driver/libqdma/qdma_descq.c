@@ -605,7 +605,12 @@ static ssize_t descq_proc_st_h2c_request(struct qdma_descq *descq)
 				desc->src_addr = src_addr;
 				desc->len = len;
 				desc->pld_len = len;
-				desc->cdh_flags |= S_H2C_DESC_F_ZERO_CDH;
+				/* QNIC PATCH: the qnic shell's H2C adapter requires
+				 * cdh_flags == 0 (matches the validated OpenNIC qnic
+				 * port).  Stock libqdma OR-s in S_H2C_DESC_F_ZERO_CDH
+				 * (=13), which the shell misreads as a custom
+				 * descriptor header and corrupts the egress frame. */
+				desc->cdh_flags = 0;
 				data_cnt += len;
 				src_addr += len;
 				tlen -= len;
@@ -613,14 +618,16 @@ static ssize_t descq_proc_st_h2c_request(struct qdma_descq *descq)
 					(u8 *)(page_address(sg->pg) +
 							sg->offset);
 
-				/* Setting SOP/EOP for the dummy bypass case */
-				if (descq->conf.desc_bypass) {
-					if (i == 0)
-						desc->flags |= S_H2C_DESC_F_SOP;
+				/* QNIC PATCH: the qnic shell's H2C adapter requires
+				 * per-packet SOP/EOP framing (pld_len alone is not
+				 * enough; matches the validated OpenNIC qnic port).
+				 * Stock libqdma only set these in desc_bypass mode;
+				 * set them for the internal ST H2C path as well. */
+				if (i == 0)
+					desc->flags |= S_H2C_DESC_F_SOP;
 
-					if ((i == sg_max - 1))
-						desc->flags |= S_H2C_DESC_F_EOP;
-				}
+				if ((i == sg_max - 1))
+					desc->flags |= S_H2C_DESC_F_EOP;
 
 #if 0
 				pr_info("desc %d, pidx 0x%x, data_cnt %u, cb off %u:\n",
